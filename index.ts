@@ -84,6 +84,7 @@ type Mutation {
 const resolvers = {
   Query: {
     getTodoList: (parent: any, { id }: any, context: any, info: any): Promise<TodoList> => {
+      console.log(TodoList.find(id))
       return TodoList.find(id);
     },
   },
