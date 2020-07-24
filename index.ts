@@ -1,7 +1,6 @@
-import { readFileStr } from 'https://deno.land/std/fs/read_file_str.ts';
-import { CasualDB } from "https://deno.land/x/casualdb@v0.1.2/mod.ts";
 import { Application } from "https://deno.land/x/oak/mod.ts";
 import { applyGraphQL, gql, GQLError } from "https://deno.land/x/oak_graphql/mod.ts";
+import { DataTypes, Database, Model } from 'https://deno.land/x/denodb/mod.ts';
 
 const app = new Application();
 
@@ -18,21 +17,32 @@ app.use(async (ctx, next) => {
   ctx.response.headers.set("X-Response-Time", `${ms}ms`);
 });
 
-// create an interface to describe the structure of your JSON
-type Schema = {
-  TodoList: Array<{
-    id: number;
-    name: string;
-  }>;
+const postgresUrl = Deno.env.get('DATABASE_URL') ?? '';
+const parsedUrl = new URL(postgresUrl);
+const db = new Database('postgres', {
+  host: parsedUrl.hostname,
+  port: Number(parsedUrl.port),
+  username: parsedUrl.username,
+  password: parsedUrl.password,
+  database: parsedUrl.pathname.slice(1) // remove first slash
+});
+
+class TodoList extends Model {
+  static table = 'todo_lists';
+  static timestamps = true;
+
+  // 当然undefinedなことはあると思うけどsampleがこうしてしまってるので信頼してみる
+  id!: number;
+  name!: string;
+
+  static fields = {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: DataTypes.string(65535)
+  };
 }
 
-const db = new CasualDB<Schema>();
-
-await db.connect("./db.json");
-
-// (optional) seed it with data, if starting with an empty db
-const defaultData = await readFileStr("./db-default.json");
-await db.seed(JSON.parse(defaultData));
+db.link([TodoList]);
+await db.sync({ drop: false });
 
 // 本家のgraphqlのほうのdenoブランチが壊れてる関係で、type importがまだoak_graphqlにない。
 // だからそれまではgql as anyか自前で型定義を書いて我慢しよう。
@@ -52,42 +62,42 @@ type TodoList {
 #   name: String
 #   isFavorite: Boolean
 # }
-# 
-# input CreateTodoListInput {
-#   firstName: String
-#   lastName: String
-# }
-# 
-# type ResolveType {
-#   done: Boolean
-# }
+
+input CreateTodoListInput {
+  name: String
+}
+
+type ResolveType {
+  done: Boolean
+}
 
 type Query {
   getTodoList(id: Int): TodoList
 #  getTodo(id: Int): Todo
 }
 
-# type Mutation {
-#   createTodoList(input: CreateTodoListInput!): ResolveType!
-# }
+type Mutation {
+  createTodoList(input: CreateTodoListInput!): ResolveType!
+}
 `;
 
 const resolvers = {
   Query: {
-    getTodoList: async (parent: any, { id }: any, context: any, info: any): Promise<Schema["TodoList"] | null> => {
-
-      const todoLists = await db.get<Schema['TodoList']>('TodoList'); // pass the interface key in order for type-checking to work
-      return todoLists.findOne({ id }).value() as Schema["TodoList"] | null; // maybe it is type def bug
+    getTodoList: (parent: any, { id }: any, context: any, info: any): Promise<TodoList> => {
+      return TodoList.find(id);
     },
   },
-  // Mutation: {
-  //   setUser: (parent: any, { input: { firstName, lastName } }: any, context: any, info: any) => {
-  //     console.log("input:", firstName, lastName);
-  //     return {
-  //       done: true,
-  //     };
-  //   },
-  // },
+  Mutation: {
+    createTodoList: async (parent: any, { input: { name } }: any, context: any, info: any): Promise<{ done: boolean }> => {
+      console.log("input:", name);
+      try {
+        await TodoList.create({ name });
+        return { done: true }
+      } catch {
+        return { done: false }
+      }
+    },
+  },
 };
 
 const GraphQLService = await applyGraphQL({
