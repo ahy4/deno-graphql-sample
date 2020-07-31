@@ -1,5 +1,6 @@
-import { Application } from "https://deno.land/x/oak/mod.ts";
-import { applyGraphQL, gql, GQLError } from "https://deno.land/x/oak_graphql/mod.ts";
+import { Application } from 'https://deno.land/x/oak/mod.ts';
+import { applyGraphQL, gql, GQLError } from 'https://deno.land/x/oak_graphql/mod.ts';
+import { GraphQLScalarType, Kind } from 'https://deno.land/x/oak_graphql/deps.ts';
 import { DataTypes, Database, Model } from 'https://deno.land/x/denodb/mod.ts';
 
 const app = new Application();
@@ -54,6 +55,8 @@ const types = (gql as any)`
 type TodoList {
   id: Int
   name: String
+  createdAt: Date
+  updatedAt: Date
 }
 
 # type Todo {
@@ -83,22 +86,34 @@ type Mutation {
 
 const resolvers = {
   Query: {
-    getTodoList: (parent: any, { id }: any, context: any, info: any): Promise<TodoList> => {
-      console.log(TodoList.find(id))
-      return TodoList.find(id);
-    },
+    getTodoList: (parent: any, { id }: any, context: any, info: any): Promise<TodoList> => TodoList.find(id),
   },
   Mutation: {
     createTodoList: async (parent: any, { input: { name } }: any, context: any, info: any): Promise<{ done: boolean }> => {
-      console.log("input:", name);
       try {
         await TodoList.create({ name });
-        return { done: true }
+        return { done: true };
       } catch {
-        return { done: false }
+        return { done: false };
       }
     },
   },
+  Date: new GraphQLScalarType({
+    name: 'Date',
+    description: 'Date custom scalar type',
+    parseValue(value) {
+      return new Date(value); // value from the client
+    },
+    serialize(value) {
+      return value.getTime(); // value sent to the client
+    },
+    parseLiteral(ast) {
+      if (ast.kind === Kind.INT) {
+        return parseInt(ast.value, 10); // ast value is always in string format
+      }
+      return null;
+    },
+  }),
 };
 
 const GraphQLService = await applyGraphQL({
