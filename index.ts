@@ -255,7 +255,7 @@ const resolvers = {
         }
         await TodoListHistoryModel.create({
           todoListId,
-          name: name || previousTodoListHistory.name,
+          name: name ?? previousTodoListHistory.name,
         });
         return { done: true };
       } catch (e) {
