@@ -1,7 +1,7 @@
-import { Application } from 'https://deno.land/x/oak/mod.ts';
+import { Application, Router, RouterContext } from 'https://deno.land/x/oak/mod.ts';
 import { applyGraphQL, gql, GQLError } from 'https://deno.land/x/oak_graphql/mod.ts';
 import { GraphQLScalarType, Kind } from 'https://deno.land/x/oak_graphql/deps.ts';
-import { DataTypes, Database, Model } from 'https://deno.land/x/denodb/mod.ts';
+import { DataTypes, Database, Model, Relationships } from 'https://deno.land/x/denodb/mod.ts';
 
 const app = new Application();
 
@@ -25,89 +25,268 @@ const db = new Database('postgres', {
   port: Number(parsedUrl.port),
   username: parsedUrl.username,
   password: parsedUrl.password,
-  database: parsedUrl.pathname.slice(1) // remove first slash
+  database: parsedUrl.pathname.slice(1), // remove first slash
 });
 
-class TodoList extends Model {
+class TodoListModel extends Model {
   static table = 'todo_lists';
   static timestamps = true;
 
-  // 当然undefinedなことはあると思うけどsampleがこうしてしまってるので信頼してみる
-  id!: number;
-  name!: string;
+  // 挿入前など、当然undefinedなことはあると思うけどsampleがこうしてしまってるので信頼してみる
+  todoListId!: number;
+  createdAt!: Date;
+  updatedAt!: Date;
 
   static fields = {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    name: DataTypes.string(65535)
+    todoListId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   };
 }
 
-db.link([TodoList]);
-await db.sync({ drop: false });
+class TodoListHistoryModel extends Model {
+  static table = 'todo_list_histories';
+  static timestamps = true;
 
-// 本家のgraphqlのほうのdenoブランチが壊れてる関係で、type importがまだoak_graphqlにない。
-// だからそれまではgql as anyか自前で型定義を書いて我慢しよう。
-// 参考資料:
-// もともとの型定義 https://github.com/apollographql/graphql-tag/blob/v2.10.3/index.d.ts
-// graphql-jsのdenoブランチの型定義が壊れてる https://github.com/graphql/graphql-js/blob/deno/index.d.ts
-// oak_graphqlはそれを読もうとしてうまくいかなかったのでやめてる https://github.com/aaronwlee/Oak-GraphQL/blob/master/deps.ts
-const types = (gql as any)`
-type TodoList {
-  id: Int
-  name: String
-  createdAt: Date
-  updatedAt: Date
+  todoListHistoryId!: number;
+  todoListId!: number;
+  name!: string;
+  createdAt!: Date;
+  updatedAt!: Date;
+
+  static fields = {
+    todoListHistoryId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    todoListId: Relationships.belongsTo(TodoListModel),
+    name: DataTypes.string(65535),
+  };
 }
 
-# type Todo {
-#   id: Int
-#   todoListId: Int
-#   name: String
-#   isFavorite: Boolean
-# }
+class TodoModel extends Model {
+  static table = 'todos';
+  static timestamps = true;
 
-input CreateTodoListInput {
-  name: String
+  todoId!: number;
+  todoListId!: number;
+  createdAt!: Date;
+  updatedAt!: Date;
+
+  static fields = {
+    todoId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    todoListId: Relationships.belongsTo(TodoListModel),
+  };
 }
+
+class TodoHistoryModel extends Model {
+  static table = 'todo_histories';
+  static timestamps = true;
+
+  todoHistoryId!: number;
+  todoId!: number;
+  name!: string;
+  isFavorite!: boolean;
+  deadline!: Date;
+  createdAt!: Date;
+  updatedAt!: Date;
+
+  static fields = {
+    todoHistoryId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    todoId: Relationships.belongsTo(TodoModel),
+    name: DataTypes.string(65535),
+    isFavorite: DataTypes.BOOLEAN,
+    deadline: DataTypes.DATETIME,
+  };
+
+  static defaults = {
+    isFavorite: false,
+    deadline: '9999-12-31 23:59:59',
+  };
+}
+
+const models = [
+  TodoListModel,
+  TodoListHistoryModel,
+  TodoModel,
+  TodoHistoryModel,
+];
+db.link(models);
+for (const model of models.concat().reverse()) {
+  await model.drop();
+}
+for (const model of models) {
+  await model.createTable();
+}
+
+const types = gql`
+scalar Date
 
 type ResolveType {
   done: Boolean
 }
 
+type TodoList {
+  todoListId: Int
+  name: String
+  createdAt: Date
+  updatedAt: Date
+}
+
+type Todo {
+  todoId: Int
+  todoListId: Int
+  name: String
+  isFavorite: Boolean
+  deadline: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+input CreateTodoListInput {
+  name: String!
+}
+
+input UpdateTodoListInput {
+  todoListId: Int!
+  name: String
+}
+
+input CreateTodoInput {
+  todoListId: Int!
+  name: String!
+  isFavorite: Boolean
+  deadline: Date
+}
+
+input UpdateTodoInput {
+  todoId: Int!
+  name: String
+  isFavorite: Boolean
+  deadline: Date
+}
+
 type Query {
-  getTodoList(id: Int): TodoList
-#  getTodo(id: Int): Todo
+  getTodoList(todoListId: Int): TodoList
+  getTodo(todoId: Int): Todo
 }
 
 type Mutation {
   createTodoList(input: CreateTodoListInput!): ResolveType!
+  updateTodoList(input: UpdateTodoListInput!): ResolveType!
+  createTodo(input: CreateTodoInput!): ResolveType!
+  updateTodo(input: UpdateTodoInput!): ResolveType!
 }
 `;
 
+type TodoList = {
+  todoListId: number;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type Todo = {
+  todoId: number;
+  todoListId: number;
+  name: string;
+  isFavorite: boolean;
+  deadline: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 const resolvers = {
   Query: {
-    getTodoList: (parent: any, { id }: any, context: any, info: any): Promise<TodoList> => TodoList.find(id),
+    getTodoList: async (parent: any, { todoListId }: any, context: any, info: any): Promise<TodoList | null> => {
+      const todoList: TodoListModel | undefined = await TodoListModel.find(todoListId);
+      const todoListHistory: TodoListHistoryModel | undefined = await TodoListHistoryModel
+        .where('todoListId', todoListId)
+        .orderBy('todoListHistoryId', 'desc')
+        .first();
+
+      if (!todoList || !todoListHistory) {
+        return null;
+      }
+      return {
+        todoListId: todoList.todoListId,
+        name: todoListHistory.name,
+        createdAt: todoList.createdAt,
+        updatedAt: todoListHistory.createdAt,
+      };
+    },
+    getTodo: async (parent: any, { todoId }: any, context: any, info: any): Promise<Todo | null> => {
+      const todo: TodoModel | undefined = await TodoModel.find(todoId);
+      const todoHistory: TodoHistoryModel | undefined = await TodoHistoryModel
+        .where('todoId', todoId)
+        .orderBy('todoHistoryId', 'desc')
+        .first();
+
+      if (!todo || !todoHistory) {
+        return null;
+      }
+      return {
+        todoId: todo.todoId,
+        todoListId: todo.todoListId,
+        name: todoHistory.name,
+        isFavorite: todoHistory.isFavorite,
+        deadline: todoHistory.deadline,
+        createdAt: todo.createdAt,
+        updatedAt: todoHistory.createdAt,
+      };
+    },
   },
   Mutation: {
+    // TODO: Type
     createTodoList: async (parent: any, { input: { name } }: any, context: any, info: any): Promise<{ done: boolean }> => {
       try {
-        await TodoList.create({ name });
+        const { todoListId } = await TodoListModel.create({});
+        await TodoListHistoryModel.create({ todoListId, name });
         return { done: true };
-      } catch {
+      } catch (e) {
+        console.log(e);
         return { done: false };
       }
     },
+    // TODO: Type
+    updateTodoList: async (parent: any, { input: { todoListId, name } }: any, context: any, info: any): Promise<{ done: boolean }> => {
+      try {
+        const previousTodoListHistory = await TodoListHistoryModel
+          .where('todoListId', todoListId)
+          .orderBy('todoListHistoryId', 'desc')
+          .first();
+        if (!previousTodoListHistory) {
+          return { done: false };
+        }
+        await TodoListHistoryModel.create({
+          todoListId,
+          name: name || previousTodoListHistory.name,
+        });
+        return { done: true };
+      } catch (e) {
+        return { done: false };
+      }
+    },
+    // TODO: Type
+    createTodo: async (parent: any, { input: { todoListId, name, isFavorite, deadline } }: any, info: any): Promise<{ done: boolean }> => {
+      try {
+        const { todoId } = await TodoModel.create({ todoListId });
+        await TodoHistoryModel.create({ todoId, name, isFavorite, deadline });
+        return { done: true };
+      } catch (e) {
+        console.log(e);
+        return { done: false };
+      }
+    },
+    updateTodo: async (parent: any, { input: { todoListId, name } }: any, context: any, info: any): Promise<{ done: boolean }> => {
+      return { done: false };
+    },
   },
-  Date: new GraphQLScalarType({
+  Date: new (GraphQLScalarType as any)({
     name: 'Date',
     description: 'Date custom scalar type',
-    parseValue(value) {
+    parseValue(value: any) {
       return new Date(value); // value from the client
     },
-    serialize(value) {
+    serialize(value: any) {
       return value.getTime(); // value sent to the client
     },
-    parseLiteral(ast) {
+    parseLiteral(ast: any) {
       if (ast.kind === Kind.INT) {
         return parseInt(ast.value, 10); // ast value is always in string format
       }
@@ -116,13 +295,14 @@ const resolvers = {
   }),
 };
 
-const GraphQLService = await applyGraphQL({
+const GraphQLService = await applyGraphQL<Router>({
   typeDefs: types,
   resolvers: resolvers,
-  context: (ctx) => {
+  context: (ctx: RouterContext) => {
     return {};
-  }
-})
+  },
+  Router,
+});
 
 app.use(GraphQLService.routes(), GraphQLService.allowedMethods());
 
