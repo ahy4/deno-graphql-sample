@@ -1,0 +1,57 @@
+scalar Date
+
+type ResolveType {
+  done: Boolean
+}
+
+type TodoList {
+  todoListId: Int
+  name: String
+  createdAt: Date
+  updatedAt: Date
+}
+
+type Todo {
+  todoId: Int
+  todoListId: Int
+  name: String
+  isFavorite: Boolean
+  deadline: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+input CreateTodoListInput {
+  name: String!
+}
+
+input UpdateTodoListInput {
+  todoListId: Int!
+  name: String
+}
+
+input CreateTodoInput {
+  todoListId: Int!
+  name: String!
+  isFavorite: Boolean
+  deadline: Date
+}
+
+input UpdateTodoInput {
+  todoId: Int!
+  name: String
+  isFavorite: Boolean
+  deadline: Date
+}
+
+type Query {
+  getTodoList(todoListId: Int): TodoList
+  getTodo(todoId: Int): Todo
+}
+
+type Mutation {
+  createTodoList(input: CreateTodoListInput!): ResolveType!
+  updateTodoList(input: UpdateTodoListInput!): ResolveType!
+  createTodo(input: CreateTodoInput!): ResolveType!
+  updateTodo(input: UpdateTodoInput!): ResolveType!
+}

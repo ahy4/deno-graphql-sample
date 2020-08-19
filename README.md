@@ -2,8 +2,8 @@
 
 ## 次やること
 
-mutationの型をちゃんとする
-graphqlっぽいディレクトリ構造にする
+DIを使うために、newableに書き換える
+DIを整備する
 
 ## TodoList DDL
 
