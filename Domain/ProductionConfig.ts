@@ -27,4 +27,4 @@ export const getPostgresConfig = createProductionConfig<PostgresConfigType>(() =
   };
 });
 
-export const getRefreshDatabase = createProductionConfig<RefreshDatabaseType>(() => true);
+export const getRefreshDatabase = createProductionConfig<RefreshDatabaseType>(() => false);
