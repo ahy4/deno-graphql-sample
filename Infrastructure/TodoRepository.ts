@@ -1,46 +1,64 @@
-import TodoListModel from '../Domain/TodoListModel.ts';
-import TodoListHistoryModel from '../Domain/TodoListHistoryModel.ts';
-import TodoListRepositoryType from '../Domain/TodoListRepositoryType.ts';
+import TodoModel from '../Domain/TodoModel.ts';
+import TodoHistoryModel from '../Domain/TodoHistoryModel.ts';
+import TodoRepositoryType, {
+  CreateTodoArgument,
+  UpdateTodoArgument,
+} from '../Domain/TodoRepositoryType.ts';
+import TodoType from '../Domain/TodoType.ts';
 import { RecordNotFoundException } from '../Domain/Exception.ts';
+import { dropNullableField } from '../Domain/ObjectHelper.ts';
+import { Service } from 'https://deno.land/x/di@v0.1.1/mod.ts';
 
-export default (): TodoListRepositoryType => ({
-  find: async (todoListId) => {
-    const todoList: TodoListModel | undefined = await TodoListModel.find(todoListId);
-    const todoListHistory: TodoListHistoryModel | undefined = await TodoListHistoryModel
-      .where('todoListId', todoListId)
-      .orderBy('todoListHistoryId', 'desc')
+@Service()
+export default class TodoRepository implements TodoRepositoryType {
+  async find(todoId: number): Promise<TodoType> {
+    const todo: TodoModel | undefined = await TodoModel.find(todoId);
+    const todoHistory: TodoHistoryModel | undefined = await TodoHistoryModel
+      .where('todoId', todoId)
+      .orderBy('todoHistoryId', 'desc')
       .first();
 
-    if (!todoList) {
-      throw new RecordNotFoundException(`couldn't find master todolist. todoListId: ${todoListId}`);
+    if (!todo) {
+      throw new RecordNotFoundException(`couldn't find master todo. todoId: ${todoId}`);
     }
-    if (!todoListHistory) {
-      throw new RecordNotFoundException(`couldn't find todolist history. todoListId: ${todoListId}`);
+    if (!todoHistory) {
+      throw new RecordNotFoundException(`couldn't find todo history. todoId: ${todoId}`);
     }
     return {
-      todoListId: todoList.todoListId,
-      name: todoListHistory.name,
-      createdAt: todoList.createdAt,
-      updatedAt: todoListHistory.createdAt,
+      todoId: todo.todoId,
+      todoListId: todo.todoListId,
+      name: todoHistory.name,
+      isFavorite: todoHistory.isFavorite,
+      deadline: todoHistory.deadline,
+      createdAt: todo.createdAt,
+      updatedAt: todoHistory.createdAt,
     };
-  },
+  }
 
-  create: async ({ name }) => {
-    const { todoListId } = await TodoListModel.create({});
-    await TodoListHistoryModel.create({ todoListId, name });
-  },
+  async create({ todoListId, name, isFavorite, deadline }: CreateTodoArgument): Promise<void> {
+    const { todoId } = await TodoModel.create({ todoListId });
+    const createRecordParams = {
+      todoId,
+      name,
+      isFavorite,
+      deadline
+    };
+    await TodoHistoryModel.create(dropNullableField(createRecordParams));
+  }
 
-  update: async ({ todoListId, name }) => {
-    const previousTodoListHistory = await TodoListHistoryModel
-      .where('todoListId', todoListId)
-      .orderBy('todoListHistoryId', 'desc')
+  async update({ todoId, name, isFavorite, deadline }: UpdateTodoArgument): Promise<void> {
+    const previousTodoHistory = await TodoHistoryModel
+      .where('todoId', todoId)
+      .orderBy('todoHistoryId', 'desc')
       .first();
-    if (!previousTodoListHistory) {
-      throw new RecordNotFoundException(`couldn't find todolist history. todoListId: ${todoListId}`);
+    if (!previousTodoHistory) {
+      throw new RecordNotFoundException(`couldn't find todo history. todoId: ${todoId}`);
     }
-    await TodoListHistoryModel.create({
-      todoListId,
-      name: name ?? previousTodoListHistory.name,
+    await TodoHistoryModel.create({
+      todoId,
+      name: name ?? previousTodoHistory.name,
+      isFavorite: isFavorite ?? previousTodoHistory.isFavorite,
+      deadline: deadline ?? previousTodoHistory.deadline,
     });
   }
-});
+}

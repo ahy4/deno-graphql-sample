@@ -1,14 +1,12 @@
 {
   "compilerOptions": {
-    "allowJs": false,
+    "allowJs": true,
     "alwaysStrict": true,
-    "assumeChangesOnlyAffectDirectDependencies": false,
     "checkJs": false,
     "disableSizeLimit": false,
-    "generateCpuProfile": "profile.cpuprofile",
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": true,
-    "noImplicitReturns": true,
+    "noImplicitReturns": false,
     "noImplicitThis": true,
     "noImplicitUseStrict": false,
     "noStrictGenericChecks": false,

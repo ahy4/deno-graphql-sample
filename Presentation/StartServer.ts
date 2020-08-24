@@ -1,26 +1,45 @@
 import { Application } from 'https://deno.land/x/oak/mod.ts';
-import type { Router } from 'https://deno.land/x/oak/mod.ts';
-import { Inject } from 'https://deno.land/x/di@v0.1.1/mod.ts';
+import { Service, Inject } from 'https://deno.land/x/di@v0.1.1/mod.ts';
+import GraphqlService from '../UseCase/GraphqlService.ts';
+import SyncDatabase from '../UseCase/SyncDatabase.ts';
+import { RefreshDatabaseType } from '../Domain/ConfigType.ts';
+import { refreshDatabaseSymbol } from '../UseCase/SelectConfigByDenoEnv.ts'
 
+@Service()
 export default class StartServer {
 
-  constructor(private graphqlRouter: Router) {}
+  constructor(
+    @Inject(GraphqlService) private readonly graphqlService: GraphqlService,
+    @Inject(SyncDatabase) private readonly syncDatabase: SyncDatabase,
+    @Inject(refreshDatabaseSymbol) private readonly refreshDatabase: RefreshDatabaseType,
+  ) {}
 
-  run(): Promise<void> {
+  async run(): Promise<void> {
     console.log("Server start at http://localhost:8080");
+
+    this.syncDatabase.link();
+    if (this.refreshDatabase) {
+      this.syncDatabase.sync();
+    }
+
+    await this.createApiStream();
+  }
+
+  private async createApiStream(): Promise<void> {
+    const graphqlRouter = await this.graphqlService.getRouter();
     return new Application()
-    .use(async (ctx, next) => {
-      await next();
-      const rt = ctx.response.headers.get("X-Response-Time");
-      console.log(`${ctx.request.method} ${ctx.request.url} - ${rt}`);
-    })
-    .use(async (ctx, next) => {
-      const start = Date.now();
-      await next();
-      const ms = Date.now() - start;
-      ctx.response.headers.set("X-Response-Time", `${ms}ms`);
-    })
-    .use(this.graphqlRouter.routes(), this.graphqlRouter.allowedMethods())
-    .listen({ port: 8080 });
+      .use(async (ctx: any, next: any) => {
+        await next();
+        const rt = ctx.response.headers.get("X-Response-Time");
+        console.log(`${ctx.request.method} ${ctx.request.url} - ${rt}`);
+      })
+      .use(async (ctx: any, next: any) => {
+        const start = Date.now();
+        await next();
+        const ms = Date.now() - start;
+        ctx.response.headers.set("X-Response-Time", `${ms}ms`);
+      })
+      .use(graphqlRouter.routes(), graphqlRouter.allowedMethods())
+      .listen({ port: 8080 });
   }
 }

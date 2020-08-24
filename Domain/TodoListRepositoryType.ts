@@ -15,4 +15,6 @@ type TodoListRepositoryType = {
   update: (arg: UpdateTodoListArgument) => Promise<void>;
 };
 
+export const todoListRepositorySymbol = Symbol('todoListRepositorySymbol');
+
 export default TodoListRepositoryType;

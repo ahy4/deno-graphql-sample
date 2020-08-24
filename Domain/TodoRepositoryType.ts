@@ -20,4 +20,6 @@ type TodoRepositoryType = {
   update: (arg: UpdateTodoArgument) => Promise<void>;
 };
 
+export const todoRepositorySymbol = Symbol('todoRepositorySymbol');
+
 export default TodoRepositoryType;
