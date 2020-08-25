@@ -2,8 +2,8 @@ import { Application } from 'https://deno.land/x/oak/mod.ts';
 import { Service, Inject } from 'https://deno.land/x/di@v0.1.1/mod.ts';
 import GraphqlService from '../UseCase/GraphqlService.ts';
 import SyncDatabase from '../UseCase/SyncDatabase.ts';
-import { RefreshDatabaseType } from '../Domain/ConfigType.ts';
-import { refreshDatabaseSymbol } from '../UseCase/SelectConfigByDenoEnv.ts'
+import { RefreshDatabaseType, WebserverConfigType } from '../Domain/ConfigType.ts';
+import { refreshDatabaseSymbol, webserverConfigSymbol } from '../UseCase/SelectConfigByDenoEnv.ts'
 
 @Service()
 export default class StartServer {
@@ -12,6 +12,7 @@ export default class StartServer {
     @Inject(GraphqlService) private readonly graphqlService: GraphqlService,
     @Inject(SyncDatabase) private readonly syncDatabase: SyncDatabase,
     @Inject(refreshDatabaseSymbol) private readonly refreshDatabase: RefreshDatabaseType,
+    @Inject(webserverConfigSymbol) private readonly webserverConfig: WebserverConfigType,
   ) {}
 
   async run(): Promise<void> {
@@ -40,6 +41,6 @@ export default class StartServer {
         ctx.response.headers.set("X-Response-Time", `${ms}ms`);
       })
       .use(graphqlRouter.routes(), graphqlRouter.allowedMethods())
-      .listen({ port: 8080 });
+      .listen({ port: this.webserverConfig.port });
   }
 }

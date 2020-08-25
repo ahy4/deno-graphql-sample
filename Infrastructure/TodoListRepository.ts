@@ -32,6 +32,8 @@ export default class TodoListRepository implements TodoListRepositoryType {
   }
 
   async create({ name }: CreateTodoListArgument): Promise<void> {
+    // denodbにはトランザクションの機能ないけど、historyの作成だけ失敗したらどうするか？削除？
+    console.log
     const { todoListId } = await TodoListModel.create({});
     await TodoListHistoryModel.create({ todoListId, name });
   }

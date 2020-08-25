@@ -7,3 +7,7 @@ export type PostgresConfigType = {
 };
 
 export type RefreshDatabaseType = boolean;
+
+export type WebserverConfigType = {
+  port: number;
+};

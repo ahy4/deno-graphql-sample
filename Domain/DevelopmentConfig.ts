@@ -1,7 +1,9 @@
 import {
   PostgresConfigType,
   RefreshDatabaseType,
+  WebserverConfigType,
 } from './ConfigType.ts';
+import { EnvVariableNotSatisfiedException } from './Exception.ts'
 
 type Development<T> = {
   type: 'development';
@@ -16,7 +18,10 @@ const createDevelopmentConfig = <T> (getConfig: () => T): GetDevelopment<T> => (
 });
 
 export const getPostgresConfig = createDevelopmentConfig<PostgresConfigType>(() => {
-  const postgresUrl = Deno.env.get('DATABASE_URL') ?? '';
+  const postgresUrl = Deno.env.get('DATABASE_URL');
+  if (!postgresUrl) {
+    throw new EnvVariableNotSatisfiedException('couldn\'t get DATABASE_URL.');
+  }
   const parsedUrl = new URL(postgresUrl);
   return {
     host: parsedUrl.hostname,
@@ -28,3 +33,9 @@ export const getPostgresConfig = createDevelopmentConfig<PostgresConfigType>(() 
 });
 
 export const getRefreshDatabase = createDevelopmentConfig<RefreshDatabaseType>(() => true);
+
+export const getWebserberConfig = createDevelopmentConfig<WebserverConfigType>(() => {
+  return {
+    port: 8080
+  };
+});

@@ -33,7 +33,7 @@ export default class GraphqlResolver {
 
   createTodoList(parent: any, { input: { name } }: any, context: any, info: any): Promise<ResolveType> {
     return toResolveType(
-      this.todoListRepository.create(name)
+      this.todoListRepository.create({ name })
     );
   }
 
