@@ -10,7 +10,11 @@ import { Service, Inject } from 'https://deno.land/x/di@v0.1.1/mod.ts';
 type ResolveType = { done: boolean };
 const toResolveType = (p: Promise<any>): Promise<ResolveType> => p
   .then(() => ({ done: true }))
-  .catch(() => ({ done: false }));
+  .catch((e) => {
+    console.warn(e);
+    console.warn(e.stack);
+    return { done: false }
+  });
 
 @Service()
 export default class GraphqlResolver {
