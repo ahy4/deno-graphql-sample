@@ -32,7 +32,7 @@ export const getPostgresConfig = createProductionConfig<PostgresConfigType>(() =
   };
 });
 
-export const getRefreshDatabase = createProductionConfig<RefreshDatabaseType>(() => false);
+export const getRefreshDatabase = createProductionConfig<RefreshDatabaseType>(() => true);
 
 export const getWebserberConfig = createProductionConfig<WebserverConfigType>(() => {
   const port = Deno.env.get('PORT');
