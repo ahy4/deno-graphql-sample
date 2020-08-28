@@ -40,8 +40,9 @@ export default class StartServer {
         const ms = Date.now() - start;
         ctx.response.headers.set("X-Response-Time", `${ms}ms`);
       })
-      .use(async (ctx: any) => {
+      .use(async (ctx: any, next: any) => {
         ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+        await next();
       })
       .use(graphqlRouter.routes(), graphqlRouter.allowedMethods())
       .listen({ port: this.webserverConfig.port });
