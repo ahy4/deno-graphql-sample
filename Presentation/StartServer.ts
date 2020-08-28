@@ -1,4 +1,5 @@
 import { Application } from 'https://deno.land/x/oak/mod.ts';
+import { oakCors } from "https://deno.land/x/cors/mod.ts";
 import { Service, Inject } from 'https://deno.land/x/di@v0.1.1/mod.ts';
 import GraphqlService from '../UseCase/GraphqlService.ts';
 import SyncDatabase from '../UseCase/SyncDatabase.ts';
@@ -40,10 +41,7 @@ export default class StartServer {
         const ms = Date.now() - start;
         ctx.response.headers.set("X-Response-Time", `${ms}ms`);
       })
-      .use(async (ctx: any, next: any) => {
-        ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-        await next();
-      })
+      .use(oakCors())
       .use(graphqlRouter.routes(), graphqlRouter.allowedMethods())
       .listen({ port: this.webserverConfig.port });
   }
